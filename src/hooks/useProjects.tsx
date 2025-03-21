@@ -1,35 +1,36 @@
-
 import { useState, useEffect } from 'react';
-import projectStore, { ProjectStore } from '@/lib/projects';
+import projectStore from '@/lib/projects';
 import { Project } from '@/components/ProjectCard';
 
 export const useProjects = () => {
-  const [projects, setProjects] = useState<Project[]>(projectStore.getProjects());
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = projectStore.subscribe(() => {
-      setProjects(projectStore.getProjects());
-    });
-    
-    return () => unsubscribe();
+    const fetchProjects = async () => {
+      setIsLoading(true);
+      try {
+        const data = await projectStore.getProjects();
+        setProjects(data);
+      } catch (err) {
+        setError('Failed to fetch projects');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProjects();
   }, []);
 
   const uploadImage = async (file: File): Promise<string | null> => {
-    setIsLoading(true);
-    setError(null);
-    
     try {
+      setIsLoading(true);
+      setError(null);
       const imageUrl = await projectStore.uploadImage(file);
-      if (!imageUrl) {
-        throw new Error('Failed to upload image');
-      }
+      if (!imageUrl) throw new Error('Failed to upload image');
       return imageUrl;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to upload image';
-      setError(errorMessage);
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to upload image');
       return null;
     } finally {
       setIsLoading(false);
@@ -37,84 +38,50 @@ export const useProjects = () => {
   };
 
   const addProject = async (project: Omit<Project, 'id'>) => {
-    setIsLoading(true);
-    setError(null);
-    
     try {
-      // Validate that the image exists
-      if (!project.image) {
-        throw new Error('Project image is required');
-      }
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      setIsLoading(true);
+      setError(null);
       const newProject = await projectStore.addProject(project);
+      if (newProject) setProjects(prev => [...prev, newProject]);
       return newProject;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add project';
-      setError(errorMessage);
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to add project');
       return null;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateProject = async (id: string, project: Omit<Project, 'id'>) => {
-    setIsLoading(true);
-    setError(null);
-    
+  const updateProject = async (id: number, project: Omit<Project, 'id'>) => {
     try {
-      // Validate that the image exists
-      if (!project.image) {
-        throw new Error('Project image is required');
-      }
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      setIsLoading(true);
+      setError(null);
       const updatedProject = await projectStore.updateProject(id, project);
-      if (!updatedProject) {
-        throw new Error('Project not found');
+      if (updatedProject) {
+        setProjects(prev => prev.map(p => (p.id === id ? updatedProject : p)));
       }
-      
       return updatedProject;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update project';
-      setError(errorMessage);
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to update project');
       return null;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const deleteProject = async (id: string) => {
-    setIsLoading(true);
-    setError(null);
-    
+  const deleteProject = async (id: number) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const result = await projectStore.deleteProject(id);
-      return result;
+      setIsLoading(true);
+      setError(null);
+      const success = await projectStore.deleteProject(id);
+      if (success) setProjects(prev => prev.filter(p => p.id !== id));
+      return success;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
-      setError(errorMessage);
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to delete project');
       return false;
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const getProject = (id: string) => {
-    return projectStore.getProject(id);
-  };
-
-  const getFeaturedProjects = () => {
-    return projectStore.getFeaturedProjects();
   };
 
   return {
@@ -125,7 +92,5 @@ export const useProjects = () => {
     addProject,
     updateProject,
     deleteProject,
-    getProject,
-    getFeaturedProjects,
   };
 };
